@@ -5,6 +5,7 @@
 package io.flutter.plugins.webviewflutter;
 
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.content.Context;
 import android.hardware.display.DisplayManager;
 import android.os.Build;
@@ -12,6 +13,8 @@ import android.os.Handler;
 import android.view.View;
 import android.webkit.WebStorage;
 import android.webkit.WebViewClient;
+
+import io.flutter.app.FlutterApplication;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -32,17 +35,25 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
   @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
   @SuppressWarnings("unchecked")
   FlutterWebView(
-      final Context context,
-      BinaryMessenger messenger,
-      int id,
-      Map<String, Object> params,
-      View containerView) {
+          final Context context,
+          BinaryMessenger messenger,
+          int id,
+          Map<String, Object> params,
+          View containerView) {
 
     DisplayListenerProxy displayListenerProxy = new DisplayListenerProxy();
     DisplayManager displayManager =
-        (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
+            (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
     displayListenerProxy.onPreWebViewInitialization(displayManager);
-    webView = new InputAwareWebView(context, containerView);
+    Context activityContext = context;
+    Context appContext = context.getApplicationContext();
+    if (appContext instanceof FlutterApplication) {
+      Activity currentActivity = ((FlutterApplication) appContext).getCurrentActivity();
+      if (currentActivity != null) {
+        activityContext = currentActivity;
+      }
+    }
+    webView = new InputAwareWebView(activityContext, containerView);
     displayListenerProxy.onPostWebViewInitialization(displayManager);
 
     platformThreadHandler = new Handler(context.getMainLooper());
@@ -219,13 +230,13 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
       throw new UnsupportedOperationException("JavaScript string cannot be null");
     }
     webView.evaluateJavascript(
-        jsString,
-        new android.webkit.ValueCallback<String>() {
-          @Override
-          public void onReceiveValue(String value) {
-            result.success(value);
-          }
-        });
+            jsString,
+            new android.webkit.ValueCallback<String>() {
+              @Override
+              public void onReceiveValue(String value) {
+                result.success(value);
+              }
+            });
   }
 
   @SuppressWarnings("unchecked")
@@ -264,7 +275,7 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
           final boolean hasNavigationDelegate = (boolean) settings.get(key);
 
           final WebViewClient webViewClient =
-              flutterWebViewClient.createWebViewClient(hasNavigationDelegate);
+                  flutterWebViewClient.createWebViewClient(hasNavigationDelegate);
 
           webView.setWebViewClient(webViewClient);
           break;
@@ -307,7 +318,7 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
   private void registerJavaScriptChannelNames(List<String> channelNames) {
     for (String channelName : channelNames) {
       webView.addJavascriptInterface(
-          new JavaScriptChannel(methodChannel, channelName, platformThreadHandler), channelName);
+              new JavaScriptChannel(methodChannel, channelName, platformThreadHandler), channelName);
     }
   }
 
